@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Secure QR Decryptor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px;
+            font-size: 16px;
+        }
+        #decrypted {
+            margin-top: 20px;
+            font-weight: bold;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Secure Message Decryptor</h1>
+    <p>Enter the decryption key below to reveal the message.</p>
+    
+    <div>
+        <input type="text" id="key" placeholder="Enter decryption key" />
+        <button onclick="decryptMessage()">Decrypt</button>
+    </div>
+
+    <p><strong>Ciphertext:</strong> <span id="ciphertext">Loading...</span></p>
+    <p><strong>Decrypted Message:</strong> <span id="decrypted"></span></p>
+
+    <script>
+    // Function to get query parameter from URL
+    function getParameterByName(name) {
+        const url = window.location.href;
+        name = name.replace(/[\[\]]/g, "\\$&");
+        const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+              results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
+
+    // Create column order based on the keyword
+    function getColumnOrder(keyword) {
+        keyword = keyword.toUpperCase().replace(/[^A-Z]/g, "");
+        let arr = keyword.split("").map((c, i) => ({ char: c, index: i }));
+        arr.sort((a, b) => a.char.localeCompare(b.char));
+        return arr.map(obj => obj.index);
+    }
+
+    // Decrypt the ciphertext using columnar transposition
+    function columnarDecrypt(ciphertext, keyword) {
+        keyword = keyword.toUpperCase().replace(/[^A-Z]/g, "");
+        if (!keyword.length) {
+            alert("Keyword must have at least one letter.");
+            return "";
+        }
+        const cols = keyword.length;
+        const rows = Math.ceil(ciphertext.length / cols);
+        const paddedLength = rows * cols;
+        let paddedCipher = ciphertext.padEnd(paddedLength, 'X');
+        const order = getColumnOrder(keyword);
+
+        // Calculate column lengths
+        let numFullCols = paddedCipher.length % cols;
+        if (numFullCols === 0) numFullCols = cols;
+        let colLengths = Array(cols).fill(rows - 1);
+        for (let i = 0; i < numFullCols; i++) colLengths[i] = rows;
+
+        // Assign ciphertext to columns in order
+        let colData = Array(cols).fill("");
+        let idx = 0;
+        for (let o = 0; o < cols; o++) {
+            let col = order[o];
+            colData[col] = paddedCipher.slice(idx, idx + colLengths[o]);
+            idx += colLengths[o];
+        }
+
+        // Reconstruct plaintext row by row
+        let plaintext = "";
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (r < colData[c].length) plaintext += colData[c][r];
+            }
+        }
+        return plaintext.replace(/X+$/,''); // Remove trailing padding
+    }
+
+    // Function to handle decryption when button is clicked
+    function decryptMessage() {
+        const key = document.getElementById("key").value.trim();
+        const ciphertext = document.getElementById("ciphertext").textContent.trim();
+        if (!key) {
+            alert("Please enter a keyword.");
+            return;
+        }
+        const decrypted = columnarDecrypt(ciphertext, key);
+        document.getElementById("decrypted").textContent = decrypted;
+    }
+
+    // On page load, extract the ciphertext from the URL
+    window.onload = function() {
+        const ciphertext = getParameterByName("data") || "";
+        if (!ciphertext) {
+            document.getElementById("ciphertext").textContent = "No data found in URL.";
+            return;
+        }
+        document.getElementById("ciphertext").textContent = ciphertext;
+    }
+    </script>
+</body>
+</html>
